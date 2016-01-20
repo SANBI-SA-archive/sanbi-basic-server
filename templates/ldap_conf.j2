@@ -1,0 +1,19 @@
+base {{ ldap_base }}
+
+# Another way to specify your LDAP server is to provide an
+uri {{ ldap_uri }}
+
+# RFC2307bis naming contexts
+# Syntax:
+# nss_base_XXX		base?scope?filter
+# where scope is {base,one,sub}
+# and filter is a filter to be &'d with the
+# default filter.
+# You can omit the suffix eg:
+# nss_base_passwd	ou=People,
+# to append the default base DN but this
+# may incur a small performance impact.
+nss_base_passwd	ou=People,{{ ldap_base }}?{{ ldap_scope | default('sub') }}?{{ ldap_filter | default('objectClass=person') }}
+
+# ignore system groups
+nss_initgroups_ignoreusers backup,bin,daemon,games,gnats,irc,libuuid,list,lp,mail,man,messagebus,news,ntpd,proxy,root,sshd,statd,sync,sys,syslog,uucp,www-data
