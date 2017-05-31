@@ -1,2 +1,2 @@
 # sanbi-basic-server
-SANBI server setup with authentication and NFS automounts
+Ansible role for SANBI server setup with authentication and NFS automounts
