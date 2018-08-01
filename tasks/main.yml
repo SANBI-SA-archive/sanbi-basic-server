@@ -48,13 +48,14 @@
   become: yes
 
 # set up autofs and NFS for /cip0 and home directories
-- name: install autofs, rpcbind and nfs client
+- name: install autofs, rpcbind and nfs client and server
   apt: pkg={{ item }} state=present
   become: yes
   loop:
     - autofs
     - rpcbind
     - nfs-common
+    - nfs-kernel-server #idmapd is failing otherwise - https://bugs.launchpad.net/ubuntu/+source/nfs-utils/+bug/1428961
 
 - name: start autofs and nfs services
   service: name={{ item }} state=started enabled=true
