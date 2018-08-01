@@ -1,74 +1,109 @@
 ---
+- name: ensure that host is Ubuntu host
+  fail:
+    msg: This playbook is only designed for Ubuntu hosts
+  when: ansible_distribution != "Ubuntu"
+
 # add the authorized key for root
 - name: add authorized key for passwordless root access
   authorized_key: user=root key="{{ admin_ssh_key | mandatory }}"
-
+  become: yes
 # TODO: change root password and log to password safe
 
 # basics: set the hostname
 - name: set hostname
   hostname: name={{hostname | mandatory }}
+  become: yes
 
 # install locate support
 - name: install English locale
   apt: pkg=language-pack-en state=present
+  become: yes
+  when: (ansible_distribution == "Ubuntu" and ansible_distribution_version == "16.04")
 
 # install LDAP + Kerberos
 - name: install LDAP NSS module
   apt: pkg=libnss-ldap state=present
+  become: yes
 
 - name: install LDAP NSS settings (/etc/ldap.conf)
   template: src=ldap_conf.j2 dest=/etc/ldap.conf
+  become: yes
 
 - name: install nsswitch.conf with ldap support
   copy: src=nsswitch.conf dest=/etc/nsswitch.conf owner=root group=root mode=0644
+  become: yes
 
 - name: install Heimdal Kerberos PAM support
   apt: pkg=libpam-heimdal state=present
+  become: yes
 
 - name: install krb.conf
   template: src=krb5_conf.j2 dest=/etc/krb5.conf owner=root group=root mode=0644
+  become: yes
 
 # install sudoers file for sysadmin group
 - name: install sudoers file to /etc/sudoers.d/sysadmin
   copy: dest=/etc/sudoers.d/20-sysadmin-group mode=440 owner=root group=root content="%sysadmin ALL=(ALL) ALL\n"
+  become: yes
 
 # set up autofs and NFS for /cip0 and home directories
 - name: install autofs, rpcbind and nfs client
   apt: pkg={{ item }} state=present
-  with_items:
+  become: yes
+  loop:
     - autofs
     - rpcbind
     - nfs-common
 
 - name: start autofs and nfs services
   service: name={{ item }} state=started enabled=true
-  with_items:
+  become: yes
+  loop:
     - rpcbind
-    - idmapd
-    - statd
     - autofs
+
+- name: install idmapd and statd
+  service: name={{ item }} state=started enabled=true
+  become: yes
+  loop:
+    - idmapd
+    - autofs
+  when: ansible_distribution_version|float <= 16.04
 
 - name: create /net directory
   file: path=/net owner=root mode=0755 state=directory
+  become: yes
 
 - name: install autofs net map
   copy: src=auto.net dest=/etc/auto.net mode=0755 owner=root group=root
   notify: restart autofs
+  become: yes
 
 - name: create /etc/auto.master.d
   file: path=/etc/auto.master.d state=directory owner=root group=root mode=0755
+  become: yes
 
 - name: install net.autofs so autofs knows about auto.net
   copy: dest=/etc/auto.master.d/net.autofs owner=root mode=0644 content="/net /etc/auto.net\n"
   notify: restart autofs
+  become: yes
 
 - name: trigger handlers to restart services where config has changed
   meta: flush_handlers
 
 - name: create symlinks from automount dir
-  file: path={{ item.value.dest }} src={{ item.value.src }} state=link
-  with_dict: automount_links
+  file: path="{{ item.dest }}" src="{{ item.src }}" state=link
+  become: yes
+  loop: "{{ automount_links }}"
+  when: automount_links|default([]) != []
+
+- name: create symlinks from automount dir
+  file: path="{{ item.dest }}" src="{{ item.src }}" state=link
+  loop: "{{ automount_links }}"
+  when: automount_links|default([]) != []
+  become: yes
 
 - name: install HTTPS method for APT
   apt: name=apt-transport-https state=present
+  become: yes
